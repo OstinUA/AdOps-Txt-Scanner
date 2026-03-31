@@ -30,6 +30,15 @@ function initPopup() {
 
   /** @type {ScanResult[]} */
   let results = [];
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  applyTheme(savedTheme);
+  themeSelect.value = savedTheme;
+
+  themeSelect.addEventListener('change', () => {
+    const selectedTheme = themeSelect.value;
+    localStorage.setItem('theme', selectedTheme);
+    applyTheme(selectedTheme);
+  });
 
   const savedTheme = localStorage.getItem('theme') || 'light';
   applyTheme(savedTheme);
