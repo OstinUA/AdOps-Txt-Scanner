@@ -57,8 +57,10 @@ A browser-native logging and validation toolkit for high-volume `ads.txt` / `app
 AdOps-Txt-Scanner/
 ├── manifest.json        # Extension metadata and permissions
 ├── background.js        # Window/popup launch behavior
-├── popup.html           # UI markup + CSS theme tokens
-├── popup.js             # Scanner logic, parsing, progress, CSV export
+├── index.html           # UI markup + CSS theme tokens
+├── assets/
+│   ├── css/popup.css   # Popup stylesheet and theme tokens
+│   └── js/popup.js     # Scanner logic, parsing, progress, CSV export
 ├── icons/
 │   └── icon128.png      # Extension icon asset
 ├── LICENSE              # MIT license text
@@ -140,7 +142,7 @@ This project does not currently include an automated unit/integration test frame
 
 ```bash
 # JavaScript syntax validation
-node --check popup.js
+node --check assets/js/popup.js
 
 # Validate extension manifest JSON format
 python -m json.tool manifest.json > /dev/null
@@ -162,12 +164,12 @@ Manual validation checklist:
 
 ```bash
 # From repository root
-zip -r adops-txt-scanner.zip manifest.json popup.html popup.js background.js icons LICENSE README.md
+zip -r adops-txt-scanner.zip manifest.json index.html assets background.js icons LICENSE README.md
 ```
 
 ### CI/CD Integration Guidelines
 
-- Add a pipeline stage for syntax checks (`node --check popup.js`).
+- Add a pipeline stage for syntax checks (`node --check assets/js/popup.js`).
 - Add a JSON lint stage for `manifest.json`.
 - Run extension smoke tests in ephemeral Chrome profiles (optional advanced stage).
 - Publish signed package through Chrome Web Store release channels (draft -> trusted testers -> public).
@@ -184,7 +186,7 @@ Containerization is not required for runtime because the artifact is a browser e
 ### 1) Initialize a Basic Scan Session
 
 ```javascript
-// Example invocation model aligned with popup.js behavior
+// Example invocation model aligned with assets/js/popup.js behavior
 const fileType = 'ads.txt';
 const domains = ['example.com', 'google.com'];
 
@@ -230,7 +232,7 @@ const url = URL.createObjectURL(blob);
   - Values: `ads.txt` or `app-ads.txt`.
   - Effect: Changes endpoint suffix used in URL probing.
 
-- `batchSize` (defined in `popup.js`)
+- `batchSize` (defined in `assets/js/popup.js`)
   - Current default: `2`.
   - Effect: Controls number of concurrent domain checks.
 
@@ -250,8 +252,8 @@ No `.env` variables are required for current runtime.
 - No CLI startup flags are currently used.
 - Primary config surfaces are:
   - `manifest.json` for extension metadata.
-  - UI controls in `popup.html`.
-  - Runtime constants in `popup.js`.
+  - UI controls in `index.html`.
+  - Runtime constants in `assets/js/popup.js`.
 
 ## License
 

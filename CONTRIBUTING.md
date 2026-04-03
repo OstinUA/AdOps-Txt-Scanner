@@ -165,7 +165,7 @@ chrome://extensions/
 Recommended quick checks:
 
 ```bash
-node --check popup.js
+node --check assets/js/popup.js
 python -m json.tool manifest.json > /dev/null
 ```
 
@@ -257,7 +257,7 @@ All non-trivial changes must include relevant tests or equivalent validation pro
 Run at minimum:
 
 ```bash
-node --check popup.js
+node --check assets/js/popup.js
 python -m json.tool manifest.json > /dev/null
 git status --short
 ```

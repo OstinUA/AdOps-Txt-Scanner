@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ads & App-Ads Checker</title>
+  <link rel="stylesheet" href="assets/css/popup.css">
+</head>
+<body>
+  <div class="top-row">
+    <h3>Lines Checker</h3>
+    <div class="header-controls">
+      <button id="modeToggleBtn" class="mode-toggle-btn">Bulk Mode</button>
+      <button id="themeToggleBtn" class="theme-toggle-btn">Dark Theme</button>
+    </div>
+  </div>
+
+  <div id="standardModeView">
+    <textarea id="domainList" placeholder="Enter domains here or load from TXT file..."></textarea>
+
+    <div class="controls-row">
+      <input type="file" id="fileInput" accept=".txt" class="hidden-input">
+      <button id="loadFileBtn" class="btn-load">Load TXT</button>
+      <select id="fileTypeSelect">
+        <option value="app-ads.txt">app-ads.txt</option>
+        <option value="ads.txt">ads.txt</option>
+        <option value="url">Exact URL</option>
+      </select>
+      <button id="checkBtn" class="btn-check">Run Check</button>
+      <button id="stopBtn" class="btn-stop">Stop</button>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusText">Ready</span>
+      <span id="progressText">0/0</span>
+    </div>
+
+    <div class="table-container">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th class="col-url">File URL</th>
+            <th class="col-status">Status</th>
+            <th class="col-lines">Lines</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <button id="downloadBtn" class="btn-download">Download CSV</button>
+  </div>
+
+  <div id="bulkModeView" class="hidden-view">
+    <div class="controls-row">
+      <input type="file" id="bulkFileInput" accept=".txt" class="hidden-input">
+      <button id="bulkLoadFileBtn" class="btn-load bulk-third">Select TXT</button>
+      <select id="bulkFileTypeSelect" class="bulk-third">
+        <option value="app-ads.txt">app-ads.txt</option>
+        <option value="ads.txt">ads.txt</option>
+      </select>
+      <button id="bulkCheckBtn" class="btn-check bulk-last" disabled>Start Bulk Check</button>
+      <button id="bulkStopBtn" class="btn-stop bulk-last">Stop</button>
+    </div>
+
+    <div class="bulk-stats-box">
+      <div id="bulkFileStatus" class="bulk-file-status">No file selected</div>
+      <div class="bulk-row">
+        <div>
+          <div class="stat-title">Processed Domains</div>
+          <div class="stat-value" id="bulkProgressValue">0 / 0</div>
+        </div>
+        <div>
+          <div class="stat-title">Time Elapsed</div>
+          <div class="stat-value" id="bulkTimeValue">00:00</div>
+        </div>
+      </div>
+    </div>
+
+    <button id="bulkDownloadBtn" class="btn-download">Download CSV</button>
+  </div>
+
+  <script src="assets/js/popup.js"></script>
+</body>
+</html>
