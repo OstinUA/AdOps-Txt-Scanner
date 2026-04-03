@@ -376,7 +376,7 @@ function initPopup() {
     const tr = document.createElement('tr');
     const urlCell = res.url !== '-'
       ? `<a href="${res.url}" target="_blank">${res.url}</a>`
-      : `<span style="color:#999">${res.domain}</span>`;
+      : `<span class="domain-fallback">${res.domain}</span>`;
 
     tr.innerHTML = `
       <td class="col-url">${urlCell}</td>
