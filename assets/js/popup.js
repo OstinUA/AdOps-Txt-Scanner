@@ -1,22 +1,98 @@
 /**
  * @typedef {Object} ScanResult
  * @property {string} domain Original user input domain string.
- * @property {"Valid"|"Empty File"|"Error"} status Human-readable scan status.
+ * @property {string} status Human-readable scan status.
  * @property {number} lines Count of valid DIRECT/RESELLER records.
  * @property {string} url Resolved URL used for the result, or "-" when unresolved.
  * @property {"valid"|"empty"|"error"} cssClass CSS status class used in table rendering.
  */
+
+function normalizeDomain(raw) {
+  return raw.trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/$/, '')
+    .split('/')[0]
+    .toLowerCase();
+}
+
+function buildProbeUrls(domain, fileType) {
+  return [
+    `https://${domain}/${fileType}`,
+    `https://www.${domain}/${fileType}`,
+    `http://${domain}/${fileType}`,
+    `http://www.${domain}/${fileType}`
+  ];
+}
+
+async function checkSingleFile(domain, fileType) {
+  const urls = buildProbeUrls(domain, fileType);
+
+  for (const url of urls) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 7000);
+      const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+      clearTimeout(tid);
+
+      if (res.status === 200) {
+        const text = await res.text();
+        if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype')) {
+          continue;
+        }
+        const validLines = countValidLines(text);
+        return {
+          status: validLines > 0 ? 'Valid' : 'Empty File',
+          lines: validLines,
+          url
+        };
+      }
+    } catch {
+    }
+  }
+
+  return {
+    status: 'Error',
+    lines: 0,
+    url: '-'
+  };
+}
+
+function countValidLines(content) {
+  let count = 0;
+  const cleanContent = content.replace(/\uFEFF/g, '');
+  const lines = cleanContent.split(/\r?\n/);
+
+  for (const line of lines) {
+    const clean = line.split('#')[0].trim();
+    if (!clean) continue;
+
+    const parts = clean.split(',').map(p => p.trim());
+    if (parts.length >= 3) {
+      const type = parts[2].toUpperCase().replace(/[^A-Z]/g, '');
+      if (type === 'DIRECT' || type === 'RESELLER') {
+        count++;
+      }
+    }
+  }
+
+  return count;
+}
 
 function initPopup() {
   const themeToggleBtn = document.getElementById('themeToggleBtn');
   const modeToggleBtn = document.getElementById('modeToggleBtn');
   const standardModeView = document.getElementById('standardModeView');
   const bulkModeView = document.getElementById('bulkModeView');
+  const csvBulkModeView = document.getElementById('csvBulkModeView');
 
   const checkBtn = document.getElementById('checkBtn');
   const stopBtn = document.getElementById('stopBtn');
   const loadFileBtn = document.getElementById('loadFileBtn');
+  const loadCsvBtn = document.getElementById('loadCsvBtn');
   const fileInput = document.getElementById('fileInput');
+  const csvFileInput = document.getElementById('csvFileInput');
   const downloadBtn = document.getElementById('downloadBtn');
   const domainInput = document.getElementById('domainList');
   const fileTypeSelect = document.getElementById('fileTypeSelect');
@@ -34,33 +110,53 @@ function initPopup() {
   const bulkProgressValue = document.getElementById('bulkProgressValue');
   const bulkTimeValue = document.getElementById('bulkTimeValue');
 
+  const csvBulkFileInput = document.getElementById('csvBulkFileInput');
+  const csvBulkLoadBtn = document.getElementById('csvBulkLoadBtn');
+  const csvBulkCheckBtn = document.getElementById('csvBulkCheckBtn');
+  const csvBulkStopBtn = document.getElementById('csvBulkStopBtn');
+  const csvBulkDownloadBtn = document.getElementById('csvBulkDownloadBtn');
+  const csvBulkFileStatus = document.getElementById('csvBulkFileStatus');
+  const csvBulkProgress = document.getElementById('csvBulkProgress');
+  const csvBulkTime = document.getElementById('csvBulkTime');
+
   let results = [];
   let isScanning = false;
   let currentTheme = localStorage.getItem('theme') || 'light';
-  let isBulkMode = false;
-  
+  let modeIndex = 0;
+
   let bulkLines = [];
   let bulkTimerInterval = null;
   let bulkStartTime = 0;
   let bulkResultsArray = [];
 
+  let csvBulkEntries = [];
+  let csvBulkResultsArray = [];
+  let csvBulkTimerInterval = null;
+  let csvBulkStartTime = 0;
+
   applyTheme(currentTheme);
   updateThemeBtnText(currentTheme);
+  setModeByIndex(modeIndex);
 
-  // Block mode switching while a scan is running to avoid mixed UI state.
   modeToggleBtn.addEventListener('click', () => {
     if (isScanning) return;
-    isBulkMode = !isBulkMode;
-    if (isBulkMode) {
-      modeToggleBtn.innerText = 'Standard Mode';
-      standardModeView.style.display = 'none';
-      bulkModeView.style.display = 'block';
-    } else {
-      modeToggleBtn.innerText = 'Bulk Mode';
-      standardModeView.style.display = 'block';
-      bulkModeView.style.display = 'none';
-    }
+    modeIndex = (modeIndex + 1) % 3;
+    setModeByIndex(modeIndex);
   });
+
+  function setModeByIndex(index) {
+    standardModeView.style.display = index === 0 ? 'block' : 'none';
+    bulkModeView.style.display = index === 1 ? 'block' : 'none';
+    csvBulkModeView.style.display = index === 2 ? 'block' : 'none';
+
+    if (index === 0) {
+      modeToggleBtn.innerText = 'Bulk Mode';
+    } else if (index === 1) {
+      modeToggleBtn.innerText = 'CSV Bulk Mode';
+    } else {
+      modeToggleBtn.innerText = 'Standard Mode';
+    }
+  }
 
   function updateThemeBtnText(theme) {
     themeToggleBtn.innerText = theme === 'light' ? 'Dark Theme' : 'Light Theme';
@@ -74,9 +170,8 @@ function initPopup() {
   }
   themeToggleBtn.addEventListener('click', handleThemeToggle);
 
-  // Standard mode handlers.
-
   loadFileBtn.addEventListener('click', () => fileInput.click());
+  loadCsvBtn.addEventListener('click', () => csvFileInput.click());
 
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -87,6 +182,32 @@ function initPopup() {
       const count = domainInput.value.split('\n').map(l => l.trim()).filter(l => l).length;
       statusText.innerText = `Loaded ${count} domains from file`;
       fileInput.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  csvFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = String(event.target.result || '');
+      const rows = content.split(/\r?\n/);
+      const domainSet = new Set();
+
+      rows.forEach((row) => {
+        if (!row.trim()) return;
+        const firstColumn = row.split(/[;,]/)[0] || '';
+        const cleaned = firstColumn.replace(/^["']|["']$/g, '');
+        const normalized = normalizeDomain(cleaned);
+        if (normalized) domainSet.add(normalized);
+      });
+
+      const domains = Array.from(domainSet);
+      domainInput.value = domains.join('\n');
+      statusText.innerText = `Loaded ${domains.length} domains from CSV`;
+      csvFileInput.value = '';
     };
     reader.readAsText(file);
   });
@@ -112,11 +233,12 @@ function initPopup() {
     results = [];
     tableBody.innerHTML = '';
     downloadBtn.style.display = 'none';
-    
+
     checkBtn.style.display = 'none';
     stopBtn.style.display = 'block';
     stopBtn.disabled = false;
     loadFileBtn.disabled = true;
+    loadCsvBtn.disabled = true;
     domainInput.disabled = true;
     fileTypeSelect.disabled = true;
 
@@ -154,9 +276,10 @@ function initPopup() {
     checkBtn.style.display = 'block';
     stopBtn.style.display = 'none';
     loadFileBtn.disabled = false;
+    loadCsvBtn.disabled = false;
     domainInput.disabled = false;
     fileTypeSelect.disabled = false;
-    
+
     if (results.length > 0) downloadBtn.style.display = 'block';
   }
 
@@ -172,9 +295,6 @@ function initPopup() {
   checkBtn.addEventListener('click', handleCheckClick);
   downloadBtn.addEventListener('click', handleDownloadClick);
 
-
-  // Bulk mode handlers.
-
   bulkLoadFileBtn.addEventListener('click', () => bulkFileInput.click());
 
   bulkFileInput.addEventListener('change', (e) => {
@@ -185,7 +305,7 @@ function initPopup() {
       bulkLines = event.target.result.split('\n').map(l => l.trim()).filter(l => l);
       bulkFileStatus.innerText = `File loaded: ${bulkLines.length} domains ready.`;
       bulkProgressValue.innerText = `0 / ${bulkLines.length}`;
-      bulkTimeValue.innerText = "00:00";
+      bulkTimeValue.innerText = '00:00';
       bulkCheckBtn.disabled = bulkLines.length === 0;
       bulkDownloadBtn.style.display = 'none';
       bulkFileInput.value = '';
@@ -209,14 +329,14 @@ function initPopup() {
   async function handleBulkCheckClick() {
     const fileType = bulkFileTypeSelect.value;
     const total = bulkLines.length;
-    
+
     if (total === 0) return;
 
     isScanning = true;
     modeToggleBtn.disabled = true;
     bulkResultsArray = ['File URL,Status,Lines'];
     bulkDownloadBtn.style.display = 'none';
-    
+
     bulkCheckBtn.style.display = 'none';
     bulkStopBtn.style.display = 'block';
     bulkStopBtn.disabled = false;
@@ -225,12 +345,12 @@ function initPopup() {
 
     bulkFileStatus.innerText = 'Processing...';
     bulkProgressValue.innerText = `0 / ${total}`;
-    
+
     bulkStartTime = Date.now();
     bulkTimerInterval = setInterval(updateBulkTimer, 1000);
 
     let completed = 0;
-    const batchSize = 15; 
+    const batchSize = 15;
 
     for (let i = 0; i < total; i += batchSize) {
       if (!isScanning) {
@@ -266,7 +386,7 @@ function initPopup() {
     bulkStopBtn.style.display = 'none';
     bulkLoadFileBtn.disabled = false;
     bulkFileTypeSelect.disabled = false;
-    
+
     if (bulkResultsArray.length > 1) {
       bulkDownloadBtn.style.display = 'block';
     }
@@ -279,7 +399,146 @@ function initPopup() {
     triggerDownload(csvContent, 'bulk_checker_results.csv');
   });
 
-  // Shared helpers.
+  csvBulkLoadBtn.addEventListener('click', () => csvBulkFileInput.click());
+
+  csvBulkFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = String(event.target.result || '');
+      const rows = text.split(/\r?\n/).map(row => row.trim()).filter(Boolean);
+
+      const parsed = [];
+      let startIndex = 0;
+
+      if (rows.length > 0 && /(domain|url|site|website)/i.test(rows[0])) {
+        startIndex = 1;
+      }
+
+      const dedupeMap = new Map();
+
+      for (let i = startIndex; i < rows.length; i++) {
+        const row = rows[i];
+        const firstColumn = (row.split(/[;,]/)[0] || '').trim();
+        if (!firstColumn) continue;
+
+        const normalized = normalizeDomain(firstColumn);
+        if (!normalized) continue;
+
+        if (!dedupeMap.has(normalized)) {
+          dedupeMap.set(normalized, firstColumn.replace(/^["']|["']$/g, ''));
+        }
+      }
+
+      dedupeMap.forEach((rawOriginal, normalizedDomain) => {
+        parsed.push({ rawOriginal, normalizedDomain });
+      });
+
+      csvBulkEntries = parsed;
+      csvBulkResultsArray = ['Original Domain,ads.txt,app-ads.txt'];
+      csvBulkFileStatus.innerText = `File loaded: ${csvBulkEntries.length} domains ready.`;
+      csvBulkProgress.innerText = `0 / ${csvBulkEntries.length}`;
+      csvBulkTime.innerText = '00:00';
+      csvBulkCheckBtn.disabled = csvBulkEntries.length === 0;
+      csvBulkDownloadBtn.style.display = 'none';
+      csvBulkFileInput.value = '';
+    };
+    reader.readAsText(file);
+  });
+
+  function updateCsvBulkTimer() {
+    const diff = Math.floor((Date.now() - csvBulkStartTime) / 1000);
+    const m = String(Math.floor(diff / 60)).padStart(2, '0');
+    const s = String(diff % 60).padStart(2, '0');
+    csvBulkTime.innerText = `${m}:${s}`;
+  }
+
+  csvBulkStopBtn.addEventListener('click', () => {
+    isScanning = false;
+    csvBulkStopBtn.disabled = true;
+    csvBulkFileStatus.innerText = 'Stopping after current batch...';
+  });
+
+  csvBulkCheckBtn.addEventListener('click', async () => {
+    const total = csvBulkEntries.length;
+    if (total === 0) return;
+
+    isScanning = true;
+    modeToggleBtn.disabled = true;
+    csvBulkResultsArray = ['Original Domain,ads.txt,app-ads.txt'];
+
+    csvBulkCheckBtn.style.display = 'none';
+    csvBulkStopBtn.style.display = 'block';
+    csvBulkStopBtn.disabled = false;
+    csvBulkLoadBtn.disabled = true;
+    csvBulkDownloadBtn.style.display = 'none';
+
+    csvBulkFileStatus.innerText = 'Processing...';
+    csvBulkProgress.innerText = `0 / ${total}`;
+
+    csvBulkStartTime = Date.now();
+    csvBulkTimerInterval = setInterval(updateCsvBulkTimer, 1000);
+
+    const batchSize = 10;
+    let completed = 0;
+
+    for (let i = 0; i < total; i += batchSize) {
+      if (!isScanning) {
+        csvBulkFileStatus.innerText = 'Stopped by user.';
+        break;
+      }
+
+      const batch = csvBulkEntries.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (entry) => {
+          const [adsResult, appAdsResult] = await Promise.all([
+            checkSingleFile(entry.normalizedDomain, 'ads.txt'),
+            checkSingleFile(entry.normalizedDomain, 'app-ads.txt')
+          ]);
+
+          return {
+            original: entry.rawOriginal,
+            ads: adsResult.status,
+            appAds: appAdsResult.status
+          };
+        })
+      );
+
+      batchResults.forEach((row) => {
+        csvBulkResultsArray.push(`${escapeCsvCell(row.original)},${escapeCsvCell(row.ads)},${escapeCsvCell(row.appAds)}`);
+        completed++;
+      });
+
+      csvBulkProgress.innerText = `${completed} / ${total}`;
+      updateCsvBulkTimer();
+
+      if (isScanning && (i + batchSize < total)) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+    }
+
+    clearInterval(csvBulkTimerInterval);
+
+    if (isScanning) {
+      csvBulkFileStatus.innerText = 'Completed successfully!';
+    }
+
+    isScanning = false;
+    modeToggleBtn.disabled = false;
+    csvBulkCheckBtn.style.display = 'block';
+    csvBulkStopBtn.style.display = 'none';
+    csvBulkLoadBtn.disabled = false;
+
+    if (csvBulkResultsArray.length > 1) {
+      csvBulkDownloadBtn.style.display = 'block';
+    }
+  });
+
+  csvBulkDownloadBtn.addEventListener('click', () => {
+    triggerDownload(csvBulkResultsArray.join('\n'), 'csv_bulk_results.csv');
+  });
 
   function triggerDownload(content, filename) {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
@@ -291,56 +550,40 @@ function initPopup() {
     URL.revokeObjectURL(url);
   }
 
-  async function checkDomainSmart(rawDomain, fileType) {
-    let urls = [];
+  function escapeCsvCell(value) {
+    const str = String(value ?? '');
+    if (/[",\n]/.test(str)) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  }
 
+  async function checkDomainSmart(rawDomain, fileType) {
     if (fileType === 'url') {
       const exactUrl = /^(https?:\/\/)/i.test(rawDomain) ? rawDomain : `https://${rawDomain}`;
-      urls = [exactUrl];
-    } else {
-      const domain = rawDomain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '').split('/')[0];
-      urls = [
-        `https://${domain}/${fileType}`,
-        `https://www.${domain}/${fileType}`,
-        `http://${domain}/${fileType}`,
-        `http://www.${domain}/${fileType}`
-      ];
-    }
-
-    const fetchUrl = async (url) => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000);
-
       try {
-        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
-        clearTimeout(timeoutId);
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 7000);
+        const res = await fetch(exactUrl, { signal: ctrl.signal, cache: 'no-store' });
+        clearTimeout(tid);
 
-        if (response.status === 200) {
-          const text = await response.text();
-
+        if (res.status === 200) {
+          const text = await res.text();
           if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype')) {
-            throw new Error("HTML content");
+            throw new Error('HTML content');
           }
-
           const validLines = countValidLines(text);
           return {
             domain: rawDomain,
             status: validLines > 0 ? 'Valid' : 'Empty File',
             lines: validLines,
-            url: url,
+            url: exactUrl,
             cssClass: validLines > 0 ? 'valid' : 'empty'
           };
         }
-        throw new Error(`HTTP ${response.status}`);
-      } catch (e) {
-        clearTimeout(timeoutId);
-        throw e;
+      } catch {
       }
-    };
 
-    try {
-      return await Promise.any(urls.map(url => fetchUrl(url)));
-    } catch (aggregateError) {
       return {
         domain: rawDomain,
         status: 'Error',
@@ -349,30 +592,61 @@ function initPopup() {
         cssClass: 'error'
       };
     }
-  }
 
-  function countValidLines(content) {
-    let count = 0;
-    const cleanContent = content.replace(/\uFEFF/g, '');
-    const lines = cleanContent.split(/\r?\n/);
+    const normalizedDomain = normalizeDomain(rawDomain);
 
-    for (const line of lines) {
-      const clean = line.split('#')[0].trim();
-      if (!clean) continue;
-
-      const parts = clean.split(',').map(p => p.trim());
-      if (parts.length >= 3) {
-        const type = parts[2].toUpperCase().replace(/[^A-Z]/g, '');
-        if (type === 'DIRECT' || type === 'RESELLER') {
-          count++;
-        }
-      }
+    if (!normalizedDomain) {
+      return {
+        domain: rawDomain,
+        status: 'Error',
+        lines: 0,
+        url: '-',
+        cssClass: 'error'
+      };
     }
 
-    return count;
+    if (fileType === 'both') {
+      const [adsSettled, appAdsSettled] = await Promise.allSettled([
+        checkSingleFile(normalizedDomain, 'ads.txt'),
+        checkSingleFile(normalizedDomain, 'app-ads.txt')
+      ]);
+
+      const adsResult = adsSettled.status === 'fulfilled' ? adsSettled.value : { status: 'Error', lines: 0, url: '-' };
+      const appAdsResult = appAdsSettled.status === 'fulfilled' ? appAdsSettled.value : { status: 'Error', lines: 0, url: '-' };
+
+      const status = `ads: ${adsResult.status}${adsResult.status === 'Valid' ? ` (${adsResult.lines})` : ''} / app-ads: ${appAdsResult.status}${appAdsResult.status === 'Valid' ? ` (${appAdsResult.lines})` : ''}`;
+      const totalLines = adsResult.lines + appAdsResult.lines;
+
+      let cssClass = 'error';
+      if (adsResult.status === 'Valid' || appAdsResult.status === 'Valid') {
+        cssClass = 'valid';
+      } else if (adsResult.status === 'Empty File' && appAdsResult.status === 'Empty File') {
+        cssClass = 'empty';
+      }
+
+      const resolvedUrl = adsResult.url !== '-' ? adsResult.url : (appAdsResult.url !== '-' ? appAdsResult.url : '-');
+
+      return {
+        domain: rawDomain,
+        status,
+        lines: totalLines,
+        url: resolvedUrl,
+        cssClass
+      };
+    }
+
+    const single = await checkSingleFile(normalizedDomain, fileType);
+
+    return {
+      domain: rawDomain,
+      status: single.status,
+      lines: single.lines,
+      url: single.url,
+      cssClass: single.status === 'Valid' ? 'valid' : (single.status === 'Empty File' ? 'empty' : 'error')
+    };
   }
 
-  function addResultToTable(res, tableBody) {
+  function addResultToTable(res, tableBodyElement) {
     const tr = document.createElement('tr');
     const urlCell = res.url !== '-'
       ? `<a href="${res.url}" target="_blank">${res.url}</a>`
@@ -383,7 +657,7 @@ function initPopup() {
       <td class="col-status ${res.cssClass}">${res.status}</td>
       <td class="col-lines">${res.lines}</td>
     `;
-    tableBody.appendChild(tr);
+    tableBodyElement.appendChild(tr);
   }
 
   function applyTheme(theme) {
