@@ -20,9 +20,12 @@
     <div class="controls-row">
       <input type="file" id="fileInput" accept=".txt" class="hidden-input">
       <button id="loadFileBtn" class="btn-load">Load TXT</button>
+      <input type="file" id="csvFileInput" accept=".csv,.txt" class="hidden-input">
+      <button id="loadCsvBtn" class="btn-load">Load CSV</button>
       <select id="fileTypeSelect">
         <option value="app-ads.txt">app-ads.txt</option>
         <option value="ads.txt">ads.txt</option>
+        <option value="both">ads.txt + app-ads.txt</option>
         <option value="url">Exact URL</option>
       </select>
       <button id="checkBtn" class="btn-check">Run Check</button>
@@ -57,6 +60,7 @@
       <select id="bulkFileTypeSelect" class="bulk-third">
         <option value="app-ads.txt">app-ads.txt</option>
         <option value="ads.txt">ads.txt</option>
+        <option value="both">ads.txt + app-ads.txt</option>
       </select>
       <button id="bulkCheckBtn" class="btn-check bulk-last" disabled>Start Bulk Check</button>
       <button id="bulkStopBtn" class="btn-stop bulk-last">Stop</button>
@@ -77,6 +81,31 @@
     </div>
 
     <button id="bulkDownloadBtn" class="btn-download">Download CSV</button>
+  </div>
+
+  <div id="csvBulkModeView" class="hidden-view">
+    <div class="controls-row">
+      <input type="file" id="csvBulkFileInput" accept=".csv" class="hidden-input">
+      <button id="csvBulkLoadBtn" class="btn-load" style="width:30%">Select CSV</button>
+      <button id="csvBulkCheckBtn" class="btn-check" style="width:40%" disabled>Start CSV Bulk Check</button>
+      <button id="csvBulkStopBtn" class="btn-stop" style="width:30%">Stop</button>
+    </div>
+
+    <div class="bulk-stats-box">
+      <div id="csvBulkFileStatus" class="bulk-file-status">No file selected</div>
+      <div class="bulk-row">
+        <div>
+          <div class="stat-title">Processed</div>
+          <div class="stat-value" id="csvBulkProgress">0 / 0</div>
+        </div>
+        <div>
+          <div class="stat-title">Time Elapsed</div>
+          <div class="stat-value" id="csvBulkTime">00:00</div>
+        </div>
+      </div>
+    </div>
+
+    <button id="csvBulkDownloadBtn" class="btn-download">Download Result CSV</button>
   </div>
 
   <script src="assets/js/popup.js"></script>

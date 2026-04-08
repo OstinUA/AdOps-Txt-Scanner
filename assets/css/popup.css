@@ -63,7 +63,7 @@ textarea {
 }
 
 select {
-  width: 25%;
+  width: 23%;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -90,7 +90,7 @@ button:disabled {
 }
 
 .btn-load {
-  width: 25%;
+  width: 18%;
   background: var(--accent);
   transition: background 0.3s;
 }
@@ -100,7 +100,7 @@ button:disabled {
 }
 
 .btn-check {
-  width: 50%;
+  width: 23%;
   background: var(--accent);
 }
 
@@ -109,7 +109,7 @@ button:disabled {
 }
 
 .btn-stop {
-  width: 50%;
+  width: 23%;
   background: var(--stop-bg);
   display: none;
 }
@@ -155,12 +155,14 @@ th {
 }
 
 .col-url {
-  width: 60%;
+  width: 50%;
   word-break: break-all;
 }
 
 .col-status {
-  width: 25%;
+  width: 35%;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .col-lines {
@@ -296,7 +298,6 @@ a:hover {
   color: var(--accent);
   font-weight: bold;
 }
-
 
 .domain-fallback {
   color: #999;
