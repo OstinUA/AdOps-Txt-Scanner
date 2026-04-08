@@ -364,22 +364,16 @@ function initPopup() {
     bulkTimeValue.innerText = `${m}:${s}`;
   }
 
-  bulkStopBtn.addEventListener('click', () => {
-    isScanning = false;
-    bulkStopBtn.disabled = true;
-    bulkFileStatus.innerText = 'Stopping after current batch...';
-  });
-
   function buildBulkHeader(checkType, includeStatus) {
     if (checkType === 'both') {
       if (includeStatus) {
-        return 'Domain,ads.txt Status,ads.txt Lines,app-ads.txt Status,app-ads.txt Lines';
+        return 'Domain,ads.txt Status,app-ads.txt Status';
       }
       return 'Domain,ads.txt Lines,app-ads.txt Lines';
     }
 
     if (includeStatus) {
-      return 'File URL,Status,Lines';
+      return 'File URL,Status';
     }
     return 'File URL,Lines';
   }
@@ -448,9 +442,7 @@ function initPopup() {
               [
                 escapeCsvCell(rowDomain),
                 escapeCsvCell(adsStatus),
-                adsLines,
-                escapeCsvCell(appAdsStatus),
-                appAdsLines
+                escapeCsvCell(appAdsStatus)
               ].join(',')
             );
           } else {
@@ -465,7 +457,7 @@ function initPopup() {
         } else {
           const urlForCsv = res.url !== '-' ? res.url : res.domain;
           if (includeStatus) {
-            bulkResultsArray.push(`${escapeCsvCell(urlForCsv)},${escapeCsvCell(res.status)},${res.lines}`);
+            bulkResultsArray.push(`${escapeCsvCell(urlForCsv)},${escapeCsvCell(res.status)}`);
           } else {
             bulkResultsArray.push(`${escapeCsvCell(urlForCsv)},${res.lines}`);
           }
