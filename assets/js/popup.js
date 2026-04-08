@@ -1,10 +1,11 @@
 /**
+ * Shared shape for rows rendered in the results table.
  * @typedef {Object} ScanResult
- * @property {string} domain Original user input domain string.
- * @property {string} status Human-readable scan status.
- * @property {number} lines Count of valid DIRECT/RESELLER records.
- * @property {string} url Resolved URL used for the result, or "-" when unresolved.
- * @property {"valid"|"empty"|"error"} cssClass CSS status class used in table rendering.
+ * @property {string} domain
+ * @property {string} status
+ * @property {number} lines
+ * @property {string} url
+ * @property {"valid"|"empty"|"error"} cssClass
  */
 
 function normalizeDomain(raw) {
